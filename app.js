@@ -17,6 +17,7 @@ const downloadBtn = document.getElementById('downloadBtn');
 const historyList = document.getElementById('historyList');
 const toastContainer = document.getElementById('toastContainer');
 // Format Tabs
+const formatTabs = document.querySelectorAll('.format-tab');
 const BACKEND_URL = (() => {
     // Railway production - same server
     if (window.location.hostname.includes('railway.app')) {
@@ -37,6 +38,7 @@ let currentFormatType = 'video';
 let allFormats = [];
 let activeDownloads = new Map(); // Track all active downloads
 let progressPollingIntervals = new Map(); // Track polling intervals
+let savedDownloads = new Set(); // Prevent duplicate save prompts
 
 // Initialize
 loadHistory();
@@ -474,6 +476,10 @@ function addDownloadToQueue(downloadId) {
 
 // Start polling for download progress
 function startProgressPolling(downloadId) {
+    if (progressPollingIntervals.has(downloadId)) {
+        return;
+    }
+
     const pollInterval = setInterval(async () => {
         try {
             const response = await fetch(`${BACKEND_URL}/api/download-progress/${downloadId}`);
@@ -668,9 +674,13 @@ async function cancelDownload(downloadId) {
 
 // Download completed file - Proper file save
 async function downloadCompletedFile(downloadId) {
+    if (savedDownloads.has(downloadId)) {
+        return;
+    }
+
     try {
         const download = activeDownloads.get(downloadId);
-        
+
         // Fetch the file as blob
         const response = await fetch(`${BACKEND_URL}/api/get-file/${downloadId}`);
         
@@ -678,20 +688,38 @@ async function downloadCompletedFile(downloadId) {
             throw new Error('Failed to download file');
         }
         
+        // Prevent duplicate prompts once fetch succeeds
+        savedDownloads.add(downloadId);
+
         // Get filename from Content-Disposition header or use default
         const contentDisposition = response.headers.get('content-disposition');
         let filename = download?.title || 'video';
-        
+
         if (contentDisposition) {
             const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
             if (filenameMatch && filenameMatch[1]) {
                 filename = filenameMatch[1].replace(/['"]/g, '');
             }
         }
-        
-        // Add extension if not present
-        if (!filename.includes('.')) {
-            filename += '.mp4';
+
+        // Sanitize filename and determine extension
+        filename = filename.replace(/[\\/:*?"<>|]+/g, '').trim() || 'video';
+        const headerExt = (download?.formatExt || '').replace('.', '').trim();
+        const contentType = response.headers.get('content-type') || '';
+
+        let extension = headerExt;
+        if (!extension) {
+            if (contentType.includes('audio')) {
+                extension = 'mp3';
+            } else if (contentType.includes('video')) {
+                extension = 'mp4';
+            } else {
+                extension = 'mp4';
+            }
+        }
+
+        if (!filename.toLowerCase().endsWith(`.${extension.toLowerCase()}`)) {
+            filename = `${filename}.${extension}`;
         }
         
         // Get blob and create download link
@@ -721,6 +749,7 @@ async function downloadCompletedFile(downloadId) {
         }, 2000);
         
     } catch (error) {
+        savedDownloads.delete(downloadId);
         console.error('File download error:', error);
         showToast('Failed to save file. Please try again.', 'error');
     }
