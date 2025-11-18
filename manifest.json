@@ -1,0 +1,23 @@
+{
+  "name": "ZKDownloader",
+  "short_name": "ZKDownloader",
+  "description": "Download videos from anywhere",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#6145E4",
+  "theme_color": "#6145E4",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "assets/platforms/Brand Logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/platforms/Brand Logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZKDownloader - Premium Video Downloader</title>
+    <link rel="icon" type="image/png" href="assets/platforms/Brand Logo.png">
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="Professional video downloader for YouTube, Instagram, TikTok, Twitter, and Facebook">
+    
+    <!-- Preconnect for better performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Inter Font for premium look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Premium Header with Gradient Background -->
+    <header class="header">
+        <div class="logo">
+            <img src="assets/platforms/Brand Logo.png" alt="ZKDownloader" class="brand-logo">
+        </div>
+        <h1>ZKDownloader</h1>
+        <p class="subtitle">Professional video downloader with premium quality</p>
+        <div class="platforms">
+            <span class="platform-badge">
+                <img src="assets/platforms/Youtube.png" alt="YouTube" class="platform-icon">
+                YouTube
+            </span>
+            <span class="platform-badge">
+                <img src="assets/platforms/Instagram.png" alt="Instagram" class="platform-icon">
+                Instagram
+            </span>
+            <span class="platform-badge">
+                <img src="assets/platforms/Tiktok.png" alt="TikTok" class="platform-icon">
+                TikTok
+            </span>
+            <span class="platform-badge">
+                <img src="assets/platforms/Twitter.png" alt="Twitter" class="platform-icon">
+                Twitter
+            </span>
+            <span class="platform-badge">
+                <img src="assets/platforms/Facebook.png" alt="Facebook" class="platform-icon">
+                Facebook
+            </span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- URL Input Card with Glass Morphism -->
+        <div class="card">
+            <div class="card-title">🔗 Enter Video URL</div>
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="urlInput" 
+                        class="url-input" 
+                        placeholder="Paste YouTube, Instagram, TikTok, Twitter, or Facebook link..."
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+                    <button id="fetchBtn" class="btn btn-primary">
+                        <span>🔍</span>
+                        <span>Fetch Formats</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Info Card (Hidden by default) -->
+        <div id="videoInfo" class="card video-info">
+            <!-- Video Preview with Enhanced Design -->
+            <div class="video-preview">
+                <div class="video-thumbnail">
+                    <img id="videoThumbnail" src="" alt="Video thumbnail" loading="lazy">
+                </div>
+                <div class="video-details">
+                    <h3 id="videoTitle"></h3>
+                    <div class="video-meta">
+                        <span class="meta-item">
+                            <span>⏱️</span>
+                            <span id="videoDuration"></span>
+                        </span>
+                        <span class="meta-item">
+                            <span>👤</span>
+                            <span id="videoUploader"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Format Selection with Premium Cards -->
+            <div class="format-section">
+                <div class="card-title">📊 Select Quality</div>
+                <div class="format-type-tabs">
+                    <button class="format-tab active" data-type="video">
+                        <span>🎥</span>
+                        <span>Video Formats</span>
+                    </button>
+                    <button class="format-tab" data-type="audio">
+                        <span>🎵</span>
+                        <span>Audio Formats</span>
+                    </button>
+                </div>
+                <div id="formatsGrid" class="formats-grid">
+                    <!-- Premium format cards will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Section with Premium Progress -->
+        <div id="downloadSection" class="card download-section">
+            <div class="card-title">🚀 Download Progress</div>
+            <div class="progress-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <div class="download-info">
+                <span id="statusText" class="status-text">Ready to download</span>
+                <span id="speedText" class="download-speed"></span>
+            </div>
+            <button id="downloadBtn" class="btn btn-success" disabled>
+                <span>⬇️</span>
+                <span>Download Now</span>
+            </button>
+        </div>
+
+        <!-- Download Queue Manager (Vidmate Style) -->
+        <div class="card">
+            <div class="history-header">
+                <div class="card-title">📥 Download Manager</div>
+            </div>
+            <div id="historyList" class="history-list">
+                <div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <p>No active downloads</p>
+                    <p style="font-size: 13px; margin-top: 8px; opacity: 0.6;">Start downloading to see your queue here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Main App Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
