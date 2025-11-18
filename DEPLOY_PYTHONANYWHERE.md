@@ -45,12 +45,16 @@ PythonAnywhere Python apps ke liye perfect hai - **completely free, no card need
 ### **Method 2: Git Clone (Better)**
 
 1. **"Files"** tab me jao
-2. Terminal me:
+2. **"Bash"** click karein (terminal open hoga)
+3. Terminal me:
    ```bash
    cd ~
    git clone https://github.com/jacobfred19729-cloud/zkdownloader-webapp.git
-   cd zkdownloader-webapp/web_app
+   cd zkdownloader-webapp
+   ls
    ```
+   
+**Note:** Files directly `zkdownloader-webapp` folder me hain, `web_app` subdirectory me nahi!
 
 ---
 
@@ -72,8 +76,9 @@ PythonAnywhere Python apps ke liye perfect hai - **completely free, no card need
 1. **"Web"** tab me jao
 2. **"Source code"** me path set karein:
    ```
-   /home/yourusername/zkdownloader-webapp/web_app
+   /home/jacobfred1/zkdownloader-webapp
    ```
+   **Important:** `/web_app` mat add karein - files directly root me hain!
 3. **"WSGI configuration file"** click karein
 4. File edit karein:
 
@@ -81,7 +86,7 @@ PythonAnywhere Python apps ke liye perfect hai - **completely free, no card need
 import sys
 import os
 
-path = '/home/yourusername/zkdownloader-webapp/web_app'
+path = '/home/jacobfred1/zkdownloader-webapp'
 if path not in sys.path:
     sys.path.insert(0, path)
 
@@ -99,9 +104,11 @@ from backend import app as application
 **"Web"** tab me scroll karke **"Static files"** section me:
 
 1. **URL:** `/static`
-2. **Directory:** `/home/yourusername/zkdownloader-webapp/web_app`
+2. **Directory:** `/home/jacobfred1/zkdownloader-webapp`
 
 **"Add"** click karein.
+
+**Note:** Path me `/web_app` mat add karein - files directly root me hain!
 
 ---
 
