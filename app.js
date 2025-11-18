@@ -16,8 +16,7 @@ const downloadSection = document.getElementById('downloadSection');
 const downloadBtn = document.getElementById('downloadBtn');
 const historyList = document.getElementById('historyList');
 const toastContainer = document.getElementById('toastContainer');
-// Format Tabs
-const formatTabs = Array.from(document.querySelectorAll('.format-tab'));
+// BACKEND_URL
 const BACKEND_URL = (() => {
     // Railway production - same server
     if (window.location.hostname.includes('railway.app')) {
@@ -52,12 +51,16 @@ urlInput.addEventListener('keypress', (e) => {
 
 downloadBtn.addEventListener('click', startDownload);
 
-formatTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-        formatTabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        currentFormatType = tab.dataset.type;
-        displayFormats(allFormats);
+// Bind format tabs after DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    const tabs = document.querySelectorAll('.format-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentFormatType = tab.dataset.type;
+            displayFormats(allFormats);
+        });
     });
 });
 
