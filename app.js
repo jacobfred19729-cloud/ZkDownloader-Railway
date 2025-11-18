@@ -17,7 +17,7 @@ const downloadBtn = document.getElementById('downloadBtn');
 const historyList = document.getElementById('historyList');
 const toastContainer = document.getElementById('toastContainer');
 // Format Tabs
-const formatTabs = document.querySelectorAll('.format-tab');
+const formatTabs = Array.from(document.querySelectorAll('.format-tab'));
 const BACKEND_URL = (() => {
     // Railway production - same server
     if (window.location.hostname.includes('railway.app')) {
@@ -241,13 +241,21 @@ function displayFormats(formats) {
     let filteredFormats = [];
     
     if (currentFormatType === 'audio') {
-        filteredFormats = formats.filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none'));
-        
+        filteredFormats = formats.filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none' || !f.height));
+
         if (filteredFormats.length === 0) {
-            filteredFormats = formats.filter(f => f.acodec && f.acodec !== 'none').slice(0, 5);
+            filteredFormats = formats.filter(f => f.acodec && f.acodec !== 'none');
         }
-        
+
         filteredFormats.sort((a, b) => (b.abr || 0) - (a.abr || 0));
+
+        const uniqueAudio = new Set();
+        filteredFormats = filteredFormats.filter(format => {
+            const key = `${format.ext || 'audio'}-${Math.round(format.abr || 0)}`;
+            if (uniqueAudio.has(key)) return false;
+            uniqueAudio.add(key);
+            return true;
+        });
     } else {
         filteredFormats = formats.filter(f => f.vcodec && f.vcodec !== 'none' && f.height);
         filteredFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
@@ -261,7 +269,7 @@ function displayFormats(formats) {
         });
     }
     
-    filteredFormats = filteredFormats.slice(0, 6);
+    filteredFormats = filteredFormats.slice(0, 8);
     
     if (filteredFormats.length === 0) {
         formatsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">No formats available</p>';
@@ -282,7 +290,9 @@ function createFormatCard(format, isRecommended) {
     let quality, badge;
     
     if (currentFormatType === 'audio') {
-        quality = format.abr ? `${Math.round(format.abr)}kbps` : 'Audio';
+        const abrLabel = format.abr ? `${Math.round(format.abr)}kbps` : '';
+        const extLabel = (format.ext || 'Audio').toUpperCase();
+        quality = abrLabel ? `${extLabel} · ${abrLabel}` : extLabel;
         badge = isRecommended ? 'BEST' : 'AUDIO';
     } else {
         quality = format.height ? `${format.height}p` : 'Video';
@@ -472,6 +482,9 @@ function addDownloadToQueue(downloadId) {
     } else {
         historyList.appendChild(downloadItem);
     }
+
+    // Sync UI with existing status data if available
+    updateDownloadUI(downloadId, download);
 }
 
 // Start polling for download progress
@@ -678,18 +691,18 @@ async function downloadCompletedFile(downloadId) {
         return;
     }
 
+    savedDownloads.add(downloadId);
+
     try {
         const download = activeDownloads.get(downloadId);
 
         // Fetch the file as blob
         const response = await fetch(`${BACKEND_URL}/api/get-file/${downloadId}`);
-        
+
         if (!response.ok) {
+            savedDownloads.delete(downloadId);
             throw new Error('Failed to download file');
         }
-        
-        // Prevent duplicate prompts once fetch succeeds
-        savedDownloads.add(downloadId);
 
         // Get filename from Content-Disposition header or use default
         const contentDisposition = response.headers.get('content-disposition');
@@ -759,13 +772,22 @@ async function downloadCompletedFile(downloadId) {
 async function loadActiveDownloads() {
     try {
         const response = await fetch(`${BACKEND_URL}/api/active-downloads`);
-        
+
         if (response.ok) {
             const data = await response.json();
             data.downloads.forEach(download => {
                 activeDownloads.set(download.id, download);
                 addDownloadToQueue(download.id);
-                startProgressPolling(download.id);
+
+                if (download.status === 'completed') {
+                    savedDownloads.add(download.id);
+                    const downloadItem = document.getElementById(`download-${download.id}`);
+                    if (downloadItem) {
+                        downloadItem.classList.add('completed');
+                    }
+                } else {
+                    startProgressPolling(download.id);
+                }
             });
         }
     } catch (error) {
