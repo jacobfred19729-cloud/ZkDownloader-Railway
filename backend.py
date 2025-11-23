@@ -131,13 +131,31 @@ def download_worker(download_id):
                 download_data['status'] = 'processing'
                 download_data['progress'] = 100
         
-        ydl_opts = {
-            'format': download_data['format_id'],
-            'outtmpl': download_data['output_path'],
-            'quiet': True,
-            'no_warnings': True,
-            'progress_hooks': [progress_hook],
-        }
+        # For Instagram, ensure audio is merged with video
+        format_id = download_data['format_id']
+        url = download_data['url']
+        
+        # Check if this is Instagram and format needs audio merging
+        if 'instagram.com' in url:
+            # For Instagram, use format that includes both video and audio without FFmpeg
+            ydl_opts = {
+                'format': 'best[height<=720]/best',
+                'outtmpl': download_data['output_path'],
+                'quiet': True,
+                'no_warnings': True,
+                'progress_hooks': [progress_hook],
+                'extractaudio': False,  # Don't extract audio separately
+                'embed_subs': False,     # Don't embed subtitles
+                'writethumbnail': False, # Don't write thumbnail
+            }
+        else:
+            ydl_opts = {
+                'format': format_id,
+                'outtmpl': download_data['output_path'],
+                'quiet': True,
+                'no_warnings': True,
+                'progress_hooks': [progress_hook],
+            }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([download_data['url']])
