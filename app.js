@@ -11,6 +11,12 @@ const videoThumbnail = document.getElementById('videoThumbnail');
 const videoTitle = document.getElementById('videoTitle');
 const videoDuration = document.getElementById('videoDuration');
 const videoUploader = document.getElementById('videoUploader');
+const videoPlayBtn = document.getElementById('videoPlayBtn');
+const videoPlayerModal = document.getElementById('videoPlayerModal');
+const videoPlayerOverlay = document.getElementById('videoPlayerOverlay');
+const videoPlayerClose = document.getElementById('videoPlayerClose');
+const videoPlayer = document.getElementById('videoPlayer');
+const videoPlayerTitle = document.getElementById('videoPlayerTitle');
 const formatsGrid = document.getElementById('formatsGrid');
 const downloadSection = document.getElementById('downloadSection');
 const downloadBtn = document.getElementById('downloadBtn');
@@ -50,6 +56,11 @@ urlInput.addEventListener('keypress', (e) => {
 });
 
 downloadBtn.addEventListener('click', startDownload);
+
+// Video Player Event Listeners
+videoPlayBtn.addEventListener('click', openVideoPlayer);
+videoPlayerOverlay.addEventListener('click', closeVideoPlayer);
+videoPlayerClose.addEventListener('click', closeVideoPlayer);
 
 // Bind format tabs after DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -182,6 +193,13 @@ function displayVideoInfo(info) {
     videoTitle.textContent = info.title || 'Video Title';
     videoDuration.textContent = formatDuration(info.duration || 0);
     videoUploader.textContent = info.uploader || 'Unknown';
+    
+    // Store webpage_url for video player
+    if (info.webpage_url) {
+        videoInfo = { ...info, webpage_url: info.webpage_url };
+    } else if (info.url) {
+        videoInfo = { ...info, webpage_url: info.url };
+    }
     
     videoInfoCard.classList.add('active');
     videoInfoCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -468,9 +486,6 @@ function addDownloadToQueue(downloadId) {
             </div>
         </div>
         <div class="download-actions">
-            <button class="action-btn preview-btn" onclick="openVideoPreview('${downloadId}')" title="Preview" style="display:none;">
-                👁️
-            </button>
             <button class="action-btn pause-btn" onclick="pauseDownload('${downloadId}')" title="Pause">
                 ⏸️
             </button>
@@ -607,29 +622,16 @@ function updateDownloadUI(downloadId, data) {
     // Update buttons visibility
     const pauseBtn = downloadItem.querySelector('.pause-btn');
     const resumeBtn = downloadItem.querySelector('.resume-btn');
-    const previewBtn = downloadItem.querySelector('.preview-btn');
-    const cancelBtn = downloadItem.querySelector('.cancel-btn');
     
     if (data.status === 'paused') {
         pauseBtn.style.display = 'none';
         resumeBtn.style.display = 'inline-block';
-        previewBtn.style.display = 'none';
-        cancelBtn.style.display = 'inline-block';
     } else if (data.status === 'downloading' || data.status === 'preparing') {
         pauseBtn.style.display = 'inline-block';
         resumeBtn.style.display = 'none';
-        previewBtn.style.display = 'none';
-        cancelBtn.style.display = 'inline-block';
-    } else if (data.status === 'completed') {
-        pauseBtn.style.display = 'none';
-        resumeBtn.style.display = 'none';
-        previewBtn.style.display = 'inline-block';
-        cancelBtn.style.display = 'none';
     } else {
         pauseBtn.style.display = 'none';
         resumeBtn.style.display = 'none';
-        previewBtn.style.display = 'none';
-        cancelBtn.style.display = 'none';
     }
     
     // Update in activeDownloads map
@@ -868,90 +870,6 @@ async function downloadCompletedFile(downloadId) {
     }
 }
 
-// Video Preview Functions
-let currentPreviewDownloadId = null;
-
-function openVideoPreview(downloadId) {
-    const download = activeDownloads.get(downloadId);
-    if (!download || download.status !== 'completed') return;
-
-    currentPreviewDownloadId = downloadId;
-    
-    const modal = document.getElementById('videoPreviewModal');
-    const player = document.getElementById('videoPreviewPlayer');
-    const title = document.getElementById('videoPreviewTitle');
-    const size = document.getElementById('videoPreviewSize');
-    const format = document.getElementById('videoPreviewFormat');
-    const duration = document.getElementById('videoPreviewDuration');
-    
-    // Set video info
-    title.textContent = download.title || 'Video Preview';
-    size.textContent = download.total ? `Size: ${formatFileSize(download.total)}` : 'Size: --';
-    format.textContent = download.formatExt ? `Format: ${download.formatExt}` : 'Format: MP4';
-    duration.textContent = videoInfo.duration ? `Duration: ${formatDuration(videoInfo.duration)}` : 'Duration: --';
-    
-    // Set video source
-    player.src = `${BACKEND_URL}/api/get-file/${downloadId}`;
-    player.load();
-    
-    // Show modal
-    modal.classList.add('active');
-    
-    // Auto-play
-    player.play().catch(e => {
-        console.log('Auto-play prevented:', e);
-    });
-}
-
-function closeVideoPreview() {
-    const modal = document.getElementById('videoPreviewModal');
-    const player = document.getElementById('videoPreviewPlayer');
-    
-    modal.classList.remove('active');
-    player.pause();
-    player.src = '';
-    currentPreviewDownloadId = null;
-}
-
-function downloadVideoFromPreview() {
-    if (currentPreviewDownloadId) {
-        downloadCompletedFile(currentPreviewDownloadId);
-        closeVideoPreview();
-    }
-}
-
-function shareVideo() {
-    if (currentPreviewDownloadId && navigator.share) {
-        const download = activeDownloads.get(currentPreviewDownloadId);
-        navigator.share({
-            title: download.title || 'Video',
-            text: `Check out this video: ${download.title}`,
-            url: window.location.href
-        }).catch(e => {
-            console.log('Share failed:', e);
-        });
-    } else {
-        // Fallback: copy URL
-        navigator.clipboard.writeText(window.location.href).then(() => {
-            showToast('🔗 Link copied to clipboard!', 'success');
-        });
-    }
-}
-
-// Close modal on escape key
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        closeVideoPreview();
-    }
-});
-
-// Close modal on background click
-document.getElementById('videoPreviewModal').addEventListener('click', (e) => {
-    if (e.target.id === 'videoPreviewModal') {
-        closeVideoPreview();
-    }
-});
-
 // Load active downloads on page load
 async function loadActiveDownloads() {
     try {
@@ -1010,8 +928,82 @@ function loadHistory() {
     // Keep this function for compatibility
 }
 
+// Video Player Functions
+function openVideoPlayer() {
+    if (!videoInfo || !videoInfo.webpage_url) {
+        showToast('No video available for playback', 'error');
+        return;
+    }
+    
+    // Set player title
+    videoPlayerTitle.textContent = videoInfo.title || 'Video Player';
+    
+    // Try to get direct video URL for playback
+    // For YouTube, we'll use the original URL in an iframe
+    // For other platforms, we'll try to get the best video format
+    if (videoInfo.webpage_url.includes('youtube.com') || videoInfo.webpage_url.includes('youtu.be')) {
+        // Use YouTube embed for direct playback
+        const videoId = extractYouTubeId(videoInfo.webpage_url);
+        if (videoId) {
+            videoPlayer.innerHTML = `
+                <iframe 
+                    width="100%" 
+                    height="100%" 
+                    src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0" 
+                    frameborder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+                </iframe>
+            `;
+        }
+    } else {
+        // For other platforms, try to get a playable format
+        const playableFormat = allFormats.find(f => 
+            f.vcodec && f.vcodec !== 'none' && f.acodec && f.acodec !== 'none' && f.ext === 'mp4'
+        );
+        
+        if (playableFormat) {
+            videoPlayer.innerHTML = `
+                <source src="${videoInfo.webpage_url}" type="video/mp4">
+                Your browser does not support the video tag.
+            `;
+            showToast('Loading video for playback...', 'info');
+        } else {
+            // Fallback to showing the original video page
+            videoPlayer.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; height: 400px; color: white; text-align: center; padding: 20px;">
+                    <div>
+                        <h3>Direct playback not available</h3>
+                        <p>Please download the video to watch it</p>
+                        <a href="${videoInfo.webpage_url}" target="_blank" style="color: #8b5cf6; text-decoration: underline;">Watch on original platform</a>
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    // Show modal
+    videoPlayerModal.classList.add('active');
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+}
+
+function closeVideoPlayer() {
+    videoPlayerModal.classList.remove('active');
+    document.body.style.overflow = ''; // Restore scrolling
+    
+    // Reset video player
+    videoPlayer.innerHTML = '<source src="" type="video/mp4">Your browser does not support the video tag.';
+    videoPlayer.pause();
+}
+
+function extractYouTubeId(url) {
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[7].length === 11) ? match[7] : null;
+}
+
 // Toast Notifications
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', duration = 4000) {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.textContent = message;
@@ -1021,9 +1013,11 @@ function showToast(message, type = 'info') {
     setTimeout(() => {
         toast.classList.add('removing');
         setTimeout(() => {
-            toastContainer.removeChild(toast);
+            if (toastContainer.contains(toast)) {
+                toastContainer.removeChild(toast);
+            }
         }, 300);
-    }, 4000);
+    }, duration);
 }
 
 // Make functions globally available

@@ -52,6 +52,7 @@ def get_video_info():
                 'thumbnail': thumbnail,
                 'duration': info.get('duration', 0),
                 'uploader': info.get('uploader', 'Unknown'),
+                'webpage_url': info.get('webpage_url', info.get('original_url', url)),
                 'formats': [
                     {
                         'format_id': f.get('format_id'),

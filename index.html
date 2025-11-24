@@ -76,8 +76,15 @@
         <div id="videoInfo" class="card video-info">
             <!-- Video Preview with Enhanced Design -->
             <div class="video-preview">
-                <div class="video-thumbnail">
+                <div class="video-thumbnail" id="videoThumbnailContainer">
                     <img id="videoThumbnail" src="" alt="Video thumbnail" loading="lazy">
+                    <div class="video-play-overlay" id="videoPlayOverlay">
+                        <button class="video-play-btn" id="videoPlayBtn">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="video-details">
                     <h3 id="videoTitle"></h3>
@@ -144,37 +151,23 @@
         </div>
     </div>
 
-    <!-- Video Preview Modal -->
-    <div id="videoPreviewModal" class="video-preview-modal">
-        <div class="video-preview-content">
-            <div class="video-preview-header">
-                <h3 id="videoPreviewTitle">Video Preview</h3>
-                <button class="video-preview-close" onclick="closeVideoPreview()">
-                    <span>✕</span>
+    <!-- Video Player Modal -->
+    <div class="video-player-modal" id="videoPlayerModal">
+        <div class="video-player-overlay" id="videoPlayerOverlay"></div>
+        <div class="video-player-container">
+            <div class="video-player-header">
+                <h3 id="videoPlayerTitle">Video Player</h3>
+                <button class="video-player-close" id="videoPlayerClose">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
                 </button>
             </div>
-            <div class="video-preview-player">
-                <video id="videoPreviewPlayer" controls>
+            <div class="video-player-content">
+                <video id="videoPlayer" controls preload="metadata">
                     <source src="" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
-            </div>
-            <div class="video-preview-info">
-                <div class="video-preview-details">
-                    <span id="videoPreviewSize">Size: --</span>
-                    <span id="videoPreviewFormat">Format: --</span>
-                    <span id="videoPreviewDuration">Duration: --</span>
-                </div>
-                <div class="video-preview-actions">
-                    <button class="btn btn-success" onclick="downloadVideoFromPreview()">
-                        <span>⬇️</span>
-                        <span>Download</span>
-                    </button>
-                    <button class="btn btn-primary" onclick="shareVideo()">
-                        <span>🔗</span>
-                        <span>Share</span>
-                    </button>
-                </div>
             </div>
         </div>
     </div>
