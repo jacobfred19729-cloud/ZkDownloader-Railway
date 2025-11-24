@@ -1,7 +1,7 @@
 # Simple Flask Backend for ZKDownloader
 # Run: python backend.py
 
-from flask import Flask, request, jsonify, send_file, send_from_directory, Response, stream_with_context
+from flask import Flask, request, jsonify, send_file, send_from_directory, Response, stream_with_context, session
 from flask_cors import CORS
 import yt_dlp
 import os
@@ -9,15 +9,59 @@ import tempfile
 from threading import Thread, Lock
 import time
 import uuid
+from datetime import datetime, timedelta
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-CORS(app)  # Allow frontend to access
+app.secret_key = 'zkdownloader-secret-key-change-in-production'  # Change this in production
+CORS(app, supports_credentials=True)  # Allow credentials for sessions
 
-# Global download manager
-download_manager = {
-    'downloads': {},  # Active downloads
-    'lock': Lock()
-}
+# User-specific download manager
+user_download_managers = {}
+user_sessions = {}
+
+def get_user_id():
+    """Get or create user ID from session"""
+    if 'user_id' not in session:
+        # Generate unique user ID
+        session['user_id'] = str(uuid.uuid4())
+        session['created_at'] = datetime.now()
+        
+        # Initialize user download manager
+        user_download_managers[session['user_id']] = {
+            'downloads': {},  # Active downloads for this user
+            'lock': Lock()
+        }
+    
+    # Update session activity
+    session['last_activity'] = datetime.now()
+    return session['user_id']
+
+def get_user_download_manager():
+    """Get download manager for current user"""
+    user_id = get_user_id()
+    return user_download_managers[user_id]
+
+def cleanup_old_sessions():
+    """Clean up sessions older than 24 hours"""
+    current_time = datetime.now()
+    expired_users = []
+    
+    for user_id, session_data in user_sessions.items():
+        if 'last_activity' in session_data:
+            if current_time - session_data['last_activity'] > timedelta(hours=24):
+                expired_users.append(user_id)
+    
+    # Clean up expired users
+    for user_id in expired_users:
+        if user_id in user_download_managers:
+            # Clean up temp directories
+            for download_data in user_download_managers[user_id]['downloads'].values():
+                if 'temp_dir' in download_data and os.path.exists(download_data['temp_dir']):
+                    import shutil
+                    shutil.rmtree(download_data['temp_dir'])
+            
+            del user_download_managers[user_id]
+        del user_sessions[user_id]
 
 @app.route('/api/info', methods=['GET'])
 def get_video_info():
@@ -106,9 +150,12 @@ def start_download():
     temp_dir = tempfile.mkdtemp()
     output_path = os.path.join(temp_dir, '%(title)s.%(ext)s')
     
-    # Initialize download data
-    with download_manager['lock']:
-        download_manager['downloads'][download_id] = {
+    # Get user-specific download manager
+    user_manager = get_user_download_manager()
+    
+    # Initialize download data for this user
+    with user_manager['lock']:
+        user_manager['downloads'][download_id] = {
             'id': download_id,
             'url': url,
             'format_id': format_id,
@@ -127,15 +174,16 @@ def start_download():
         }
     
     # Start download in background thread
-    thread = Thread(target=download_worker, args=(download_id,))
+    thread = Thread(target=download_worker, args=(download_id, get_user_id()))
     thread.daemon = True
     thread.start()
     
     return jsonify({'download_id': download_id, 'status': 'started'})
 
-def download_worker(download_id):
+def download_worker(download_id, user_id):
     """Background worker for downloading"""
-    download_data = download_manager['downloads'].get(download_id)
+    user_manager = user_download_managers[user_id]
+    download_data = user_manager['downloads'].get(download_id)
     if not download_data:
         return
     
@@ -206,7 +254,8 @@ def download_worker(download_id):
 @app.route('/api/download-progress/<download_id>', methods=['GET'])
 def get_download_progress(download_id):
     """Get real-time download progress"""
-    download_data = download_manager['downloads'].get(download_id)
+    user_manager = get_user_download_manager()
+    download_data = user_manager['downloads'].get(download_id)
     
     if not download_data:
         return jsonify({'error': 'Download not found'}), 404
@@ -226,7 +275,8 @@ def get_download_progress(download_id):
 @app.route('/api/pause-download/<download_id>', methods=['POST'])
 def pause_download(download_id):
     """Pause a download"""
-    download_data = download_manager['downloads'].get(download_id)
+    user_manager = get_user_download_manager()
+    download_data = user_manager['downloads'].get(download_id)
     
     if not download_data:
         return jsonify({'error': 'Download not found'}), 404
@@ -239,7 +289,8 @@ def pause_download(download_id):
 @app.route('/api/resume-download/<download_id>', methods=['POST'])
 def resume_download(download_id):
     """Resume a paused download"""
-    download_data = download_manager['downloads'].get(download_id)
+    user_manager = get_user_download_manager()
+    download_data = user_manager['downloads'].get(download_id)
     
     if not download_data:
         return jsonify({'error': 'Download not found'}), 404
@@ -247,7 +298,7 @@ def resume_download(download_id):
     download_data['paused'] = False
     
     # Restart download in background
-    thread = Thread(target=download_worker, args=(download_id,))
+    thread = Thread(target=download_worker, args=(download_id, get_user_id()))
     thread.daemon = True
     thread.start()
     
@@ -256,7 +307,8 @@ def resume_download(download_id):
 @app.route('/api/cancel-download/<download_id>', methods=['POST'])
 def cancel_download(download_id):
     """Cancel a download"""
-    download_data = download_manager['downloads'].get(download_id)
+    user_manager = get_user_download_manager()
+    download_data = user_manager['downloads'].get(download_id)
     
     if not download_data:
         return jsonify({'error': 'Download not found'}), 404
@@ -272,15 +324,16 @@ def cancel_download(download_id):
     except:
         pass
     
-    with download_manager['lock']:
-        del download_manager['downloads'][download_id]
+    with user_manager['lock']:
+        del user_manager['downloads'][download_id]
     
     return jsonify({'status': 'cancelled'})
 
 @app.route('/api/get-file/<download_id>', methods=['GET'])
 def get_downloaded_file(download_id):
     """Get the downloaded file"""
-    download_data = download_manager['downloads'].get(download_id)
+    user_manager = get_user_download_manager()
+    download_data = user_manager['downloads'].get(download_id)
     
     if not download_data:
         return jsonify({'error': 'Download not found'}), 404
@@ -296,9 +349,10 @@ def get_downloaded_file(download_id):
 
 @app.route('/api/active-downloads', methods=['GET'])
 def get_active_downloads():
-    """Get all active downloads"""
+    """Get all active downloads for current user"""
+    user_manager = get_user_download_manager()
     downloads = []
-    for download_id, data in download_manager['downloads'].items():
+    for download_id, data in user_manager['downloads'].items():
         downloads.append({
             'id': data['id'],
             'title': data['title'],

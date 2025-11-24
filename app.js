@@ -32,6 +32,14 @@ const BACKEND_URL = (() => {
     return '';
 })();
 
+// Fetch options with credentials for session support
+const fetchOptions = {
+    credentials: 'include',
+    headers: {
+        'Content-Type': 'application/json'
+    }
+};
+
 
 // State
 let videoInfo = null;
@@ -161,7 +169,9 @@ async function fetchFormats() {
     try {
         const normalizedUrl = normalizeURL(url);
         
-        const response = await fetch(`${BACKEND_URL}/api/info?url=${encodeURIComponent(normalizedUrl)}`);
+        const response = await fetch(`${BACKEND_URL}/api/info?url=${encodeURIComponent(normalizedUrl)}`, {
+            credentials: 'include'
+        });
         
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
@@ -497,6 +507,7 @@ async function startDownload() {
     
     try {
         const response = await fetch(`${BACKEND_URL}/api/start-download`, {
+            ...fetchOptions,
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -635,7 +646,9 @@ function startProgressPolling(downloadId) {
 
     const pollInterval = setInterval(async () => {
         try {
-            const response = await fetch(`${BACKEND_URL}/api/download-progress/${downloadId}`);
+            const response = await fetch(`${BACKEND_URL}/api/download-progress/${downloadId}`, {
+                credentials: 'include'
+            });
             
             if (!response.ok) {
                 clearInterval(pollInterval);
@@ -801,6 +814,7 @@ function formatTime(seconds) {
 async function pauseDownload(downloadId) {
     try {
         const response = await fetch(`${BACKEND_URL}/api/pause-download/${downloadId}`, {
+            ...fetchOptions,
             method: 'POST'
         });
         
@@ -817,6 +831,7 @@ async function pauseDownload(downloadId) {
 async function resumeDownload(downloadId) {
     try {
         const response = await fetch(`${BACKEND_URL}/api/resume-download/${downloadId}`, {
+            ...fetchOptions,
             method: 'POST'
         });
         
@@ -838,6 +853,7 @@ async function resumeDownload(downloadId) {
 async function cancelDownload(downloadId) {
     try {
         const response = await fetch(`${BACKEND_URL}/api/cancel-download/${downloadId}`, {
+            ...fetchOptions,
             method: 'POST'
         });
         
@@ -888,6 +904,7 @@ async function downloadCompletedFile(downloadId) {
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
         
         const response = await fetch(`${BACKEND_URL}/api/get-file/${downloadId}`, {
+            credentials: 'include',
             signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -987,7 +1004,9 @@ async function downloadCompletedFile(downloadId) {
 // Load active downloads on page load
 async function loadActiveDownloads() {
     try {
-        const response = await fetch(`${BACKEND_URL}/api/active-downloads`);
+        const response = await fetch(`${BACKEND_URL}/api/active-downloads`, {
+            credentials: 'include'
+        });
 
         if (response.ok) {
             const data = await response.json();
