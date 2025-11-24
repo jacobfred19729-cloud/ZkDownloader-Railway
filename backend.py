@@ -3,7 +3,6 @@
 
 from flask import Flask, request, jsonify, send_file, send_from_directory, Response, stream_with_context, session
 from flask_cors import CORS
-from flask_session import Session
 import yt_dlp
 import os
 import tempfile
@@ -11,107 +10,36 @@ from threading import Thread, Lock
 import time
 import uuid
 from datetime import datetime, timedelta
-import shutil
-import re
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-
-# Configure session for Railway deployment
-secret_key = os.environ.get('SECRET_KEY', 'zkdownloader-secret-key-change-in-production')
-if not secret_key or secret_key == '':
-    secret_key = 'zkdownloader-railway-secret-key-2024'
-app.config['SECRET_KEY'] = secret_key
-print(f"Secret key configured: {secret_key[:10]}...")
-
-# Use simple client-side session for Railway compatibility
-app.config['SESSION_TYPE'] = 'null'
-app.config['SESSION_PERMANENT'] = False
-app.config['SESSION_USE_SIGNER'] = False
-
-# Initialize session
-try:
-    Session(app)
-    print("Session initialized successfully")
-except Exception as e:
-    print(f"Session initialization failed: {e}")
-    # Continue without session - will use fallback mechanism
-
+app.secret_key = 'zkdownloader-secret-key-change-in-production'  # Change this in production
 CORS(app, supports_credentials=True)  # Allow credentials for sessions
 
 # User-specific download manager
 user_download_managers = {}
 user_sessions = {}
 
-def sanitize_filename(title, max_length=50):
-    """Sanitize and shorten filename to prevent file system errors"""
-    if not title:
-        return "video"
-    
-    # Remove special characters and emojis
-    # Keep only alphanumeric, spaces, and basic punctuation
-    sanitized = re.sub(r'[^\w\s\-_.(),]', '', title)
-    
-    # Replace multiple spaces with single space
-    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
-    
-    # Remove leading/trailing punctuation
-    sanitized = sanitized.strip('._-()')
-    
-    # Limit length
-    if len(sanitized) > max_length:
-        sanitized = sanitized[:max_length].rstrip()
-    
-    # Ensure it's not empty
-    if not sanitized:
-        sanitized = "video"
-    
-    return sanitized
-
 def get_user_id():
     """Get or create user ID from session"""
-    try:
-        # Try to get user ID from session
-        user_id = session.get('user_id')
-        if not user_id:
-            # Generate unique user ID
-            user_id = str(uuid.uuid4())
-            session['user_id'] = user_id
-            session['created_at'] = datetime.now()
-            
-            # Initialize user download manager
-            user_download_managers[user_id] = {
-                'downloads': {},  # Active downloads for this user
-                'lock': Lock()
-            }
+    if 'user_id' not in session:
+        # Generate unique user ID
+        session['user_id'] = str(uuid.uuid4())
+        session['created_at'] = datetime.now()
         
-        # Update session activity
-        session['last_activity'] = datetime.now()
-        return user_id
-    except Exception as e:
-        print(f"Session error in get_user_id: {e}")
-        # Fallback to a temporary user ID
-        return f"temp_{uuid.uuid4()}"
+        # Initialize user download manager
+        user_download_managers[session['user_id']] = {
+            'downloads': {},  # Active downloads for this user
+            'lock': Lock()
+        }
+    
+    # Update session activity
+    session['last_activity'] = datetime.now()
+    return session['user_id']
 
 def get_user_download_manager():
     """Get download manager for current user"""
-    try:
-        user_id = get_user_id()
-        if user_id not in user_download_managers:
-            user_download_managers[user_id] = {
-                'downloads': {},
-                'lock': Lock()
-            }
-        return user_download_managers[user_id]
-    except Exception as e:
-        print(f"Session error in get_user_download_manager: {e}")
-        # Create a fallback user ID and manager
-        fallback_id = f"fallback_{uuid.uuid4()}"
-        if fallback_id not in user_download_managers:
-            user_download_managers[fallback_id] = {
-                'downloads': {},
-                'lock': Lock()
-            }
-        return user_download_managers[fallback_id]
+    user_id = get_user_id()
+    return user_download_managers[user_id]
 
 def cleanup_old_sessions():
     """Clean up sessions older than 24 hours"""
@@ -233,22 +161,10 @@ def start_download():
     
     # Create temp directory
     temp_dir = tempfile.mkdtemp()
+    output_path = os.path.join(temp_dir, '%(title)s.%(ext)s')
     
-    # Sanitize title for filename
-    sanitized_title = sanitize_filename(title)
-    output_path = os.path.join(temp_dir, f'{sanitized_title}.%(ext)s')
-    
-    # Get user ID first (session access in main thread)
-    user_id = get_user_id()
-    
-    # Ensure user manager exists for this user ID
-    if user_id not in user_download_managers:
-        user_download_managers[user_id] = {
-            'downloads': {},
-            'lock': Lock()
-        }
-    
-    user_manager = user_download_managers[user_id]
+    # Get user-specific download manager
+    user_manager = get_user_download_manager()
     
     # Initialize download data for this user
     with user_manager['lock']:
@@ -271,7 +187,7 @@ def start_download():
         }
     
     # Start download in background thread
-    thread = Thread(target=download_worker, args=(download_id, user_id))
+    thread = Thread(target=download_worker, args=(download_id, get_user_id()))
     thread.daemon = True
     thread.start()
     
@@ -279,15 +195,9 @@ def start_download():
 
 def download_worker(download_id, user_id):
     """Background worker for downloading"""
-    try:
-        user_manager = user_download_managers[user_id]
-    except KeyError:
-        print(f"User manager not found for user_id: {user_id}")
-        return
-    
+    user_manager = user_download_managers[user_id]
     download_data = user_manager['downloads'].get(download_id)
     if not download_data:
-        print(f"Download data not found for download_id: {download_id}")
         return
     
     try:
@@ -404,8 +314,7 @@ def resume_download(download_id):
     download_data['paused'] = False
     
     # Restart download in background
-    user_id = get_user_id()
-    thread = Thread(target=download_worker, args=(download_id, user_id))
+    thread = Thread(target=download_worker, args=(download_id, get_user_id()))
     thread.daemon = True
     thread.start()
     
@@ -476,20 +385,7 @@ def get_active_downloads():
 @app.route('/health', methods=['GET'])
 def health():
     """Health check"""
-    try:
-        # Test session functionality
-        test_user_id = get_user_id()
-        return jsonify({
-            'status': 'ok',
-            'session_test': 'working',
-            'user_id': test_user_id[:8] + '...',  # Only show first 8 chars for privacy
-            'active_users': len(user_download_managers)
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 500
+    return jsonify({'status': 'ok'})
 
 @app.route('/api/proxy-thumbnail')
 def proxy_thumbnail():
