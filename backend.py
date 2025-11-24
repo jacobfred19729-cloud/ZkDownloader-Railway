@@ -39,6 +39,14 @@ def get_user_id():
 def get_user_download_manager():
     """Get download manager for current user"""
     user_id = get_user_id()
+    
+    # Check if user manager exists, if not create it
+    if user_id not in user_download_managers:
+        user_download_managers[user_id] = {
+            'downloads': {},  # Active downloads for this user
+            'lock': Lock()
+        }
+    
     return user_download_managers[user_id]
 
 def cleanup_old_sessions():
@@ -164,11 +172,15 @@ def start_download():
     output_path = os.path.join(temp_dir, '%(title)s.%(ext)s')
     
     # Get user-specific download manager
-    user_manager = get_user_download_manager()
+    try:
+        user_manager = get_user_download_manager()
+    except Exception as e:
+        return jsonify({'error': f'Session error: {str(e)}'}), 500
     
     # Initialize download data for this user
-    with user_manager['lock']:
-        user_manager['downloads'][download_id] = {
+    try:
+        with user_manager['lock']:
+            user_manager['downloads'][download_id] = {
             'id': download_id,
             'url': url,
             'format_id': format_id,
@@ -185,11 +197,17 @@ def start_download():
             'error': None,
             'paused': False
         }
+    except Exception as e:
+        return jsonify({'error': f'Failed to initialize download: {str(e)}'}), 500
     
     # Start download in background thread
-    thread = Thread(target=download_worker, args=(download_id, get_user_id()))
-    thread.daemon = True
-    thread.start()
+    try:
+        user_id = get_user_id()
+        thread = Thread(target=download_worker, args=(download_id, user_id))
+        thread.daemon = True
+        thread.start()
+    except Exception as e:
+        return jsonify({'error': f'Failed to start download: {str(e)}'}), 500
     
     return jsonify({'download_id': download_id, 'status': 'started'})
 
@@ -270,8 +288,11 @@ def download_worker(download_id, user_id):
 @app.route('/api/download-progress/<download_id>', methods=['GET'])
 def get_download_progress(download_id):
     """Get real-time download progress"""
-    user_manager = get_user_download_manager()
-    download_data = user_manager['downloads'].get(download_id)
+    try:
+        user_manager = get_user_download_manager()
+        download_data = user_manager['downloads'].get(download_id)
+    except Exception as e:
+        return jsonify({'error': f'Session error: {str(e)}'}), 500
     
     if not download_data:
         return jsonify({'error': 'Download not found'}), 404
@@ -291,8 +312,11 @@ def get_download_progress(download_id):
 @app.route('/api/pause-download/<download_id>', methods=['POST'])
 def pause_download(download_id):
     """Pause a download"""
-    user_manager = get_user_download_manager()
-    download_data = user_manager['downloads'].get(download_id)
+    try:
+        user_manager = get_user_download_manager()
+        download_data = user_manager['downloads'].get(download_id)
+    except Exception as e:
+        return jsonify({'error': f'Session error: {str(e)}'}), 500
     
     if not download_data:
         return jsonify({'error': 'Download not found'}), 404
@@ -305,8 +329,11 @@ def pause_download(download_id):
 @app.route('/api/resume-download/<download_id>', methods=['POST'])
 def resume_download(download_id):
     """Resume a paused download"""
-    user_manager = get_user_download_manager()
-    download_data = user_manager['downloads'].get(download_id)
+    try:
+        user_manager = get_user_download_manager()
+        download_data = user_manager['downloads'].get(download_id)
+    except Exception as e:
+        return jsonify({'error': f'Session error: {str(e)}'}), 500
     
     if not download_data:
         return jsonify({'error': 'Download not found'}), 404
@@ -323,8 +350,11 @@ def resume_download(download_id):
 @app.route('/api/cancel-download/<download_id>', methods=['POST'])
 def cancel_download(download_id):
     """Cancel a download"""
-    user_manager = get_user_download_manager()
-    download_data = user_manager['downloads'].get(download_id)
+    try:
+        user_manager = get_user_download_manager()
+        download_data = user_manager['downloads'].get(download_id)
+    except Exception as e:
+        return jsonify({'error': f'Session error: {str(e)}'}), 500
     
     if not download_data:
         return jsonify({'error': 'Download not found'}), 404
@@ -348,8 +378,11 @@ def cancel_download(download_id):
 @app.route('/api/get-file/<download_id>', methods=['GET'])
 def get_downloaded_file(download_id):
     """Get the downloaded file"""
-    user_manager = get_user_download_manager()
-    download_data = user_manager['downloads'].get(download_id)
+    try:
+        user_manager = get_user_download_manager()
+        download_data = user_manager['downloads'].get(download_id)
+    except Exception as e:
+        return jsonify({'error': f'Session error: {str(e)}'}), 500
     
     if not download_data:
         return jsonify({'error': 'Download not found'}), 404
@@ -366,19 +399,26 @@ def get_downloaded_file(download_id):
 @app.route('/api/active-downloads', methods=['GET'])
 def get_active_downloads():
     """Get all active downloads for current user"""
-    user_manager = get_user_download_manager()
+    try:
+        user_manager = get_user_download_manager()
+    except Exception as e:
+        return jsonify({'error': f'Session error: {str(e)}'}), 500
+    
     downloads = []
-    for download_id, data in user_manager['downloads'].items():
-        downloads.append({
-            'id': data['id'],
-            'title': data['title'],
-            'status': data['status'],
-            'progress': data['progress'],
-            'downloaded': data['downloaded'],
-            'total': data['total'],
-            'speed': data['speed'],
-            'eta': data['eta']
-        })
+    try:
+        for download_id, data in user_manager['downloads'].items():
+            downloads.append({
+                'id': data['id'],
+                'title': data['title'],
+                'status': data['status'],
+                'progress': data['progress'],
+                'downloaded': data['downloaded'],
+                'total': data['total'],
+                'speed': data['speed'],
+                'eta': data['eta']
+            })
+    except Exception as e:
+        return jsonify({'error': f'Error retrieving downloads: {str(e)}'}), 500
     
     return jsonify({'downloads': downloads})
 
