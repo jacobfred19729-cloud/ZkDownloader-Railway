@@ -193,28 +193,45 @@ function playVideo() {
     // Get the best video URL for preview
     let videoUrl = '';
     
-    // Try to find a suitable format for preview
-    const previewFormats = videoInfo.formats.filter(f => 
-        f.vcodec && f.vcodec !== 'none' && 
-        f.height && f.height <= 720 && 
-        (f.ext === 'mp4' || f.ext === 'webm')
-    );
-    
-    if (previewFormats.length > 0) {
-        // Use the highest quality under 720p
-        const bestFormat = previewFormats.reduce((best, current) => 
-            (current.height > best.height) ? current : best
+    // Special handling for TikTok videos
+    if (videoInfo.webpage_url && videoInfo.webpage_url.includes('tiktok.com')) {
+        // For TikTok, try to get the direct video URL from formats
+        const tiktokFormats = videoInfo.formats.filter(f => 
+            f.vcodec && f.vcodec !== 'none' && 
+            f.url && 
+            (f.ext === 'mp4')
         );
-        videoUrl = bestFormat.url;
+        
+        if (tiktokFormats.length > 0) {
+            // Use the first available TikTok format
+            videoUrl = tiktokFormats[0].url;
+        }
     } else {
-        // Fallback to any video format
-        const videoFormat = videoInfo.formats.find(f => 
-            f.vcodec && f.vcodec !== 'none' && f.url
+        // Try to find a suitable format for preview (non-TikTok)
+        const previewFormats = videoInfo.formats.filter(f => 
+            f.vcodec && f.vcodec !== 'none' && 
+            f.height && f.height <= 720 && 
+            (f.ext === 'mp4' || f.ext === 'webm')
         );
-        videoUrl = videoFormat ? videoFormat.url : '';
+        
+        if (previewFormats.length > 0) {
+            // Use the highest quality under 720p
+            const bestFormat = previewFormats.reduce((best, current) => 
+                (current.height > best.height) ? current : best
+            );
+            videoUrl = bestFormat.url;
+        } else {
+            // Fallback to any video format
+            const videoFormat = videoInfo.formats.find(f => 
+                f.vcodec && f.vcodec !== 'none' && f.url
+            );
+            videoUrl = videoFormat ? videoFormat.url : '';
+        }
     }
     
     if (videoUrl) {
+        console.log('Playing video URL:', videoUrl);
+        
         // Hide thumbnail and show video player
         videoThumbnail.style.display = 'none';
         videoPlayOverlay.style.display = 'none';
@@ -226,13 +243,20 @@ function playVideo() {
         
         // Wait for video to be ready before playing
         videoPlayer.oncanplay = () => {
+            console.log('Video can play, starting playback');
             videoPlayer.play().catch(error => {
                 console.error('Error playing video:', error);
                 // Fallback to thumbnail if video fails to play
                 videoPlayer.style.display = 'none';
                 videoThumbnail.style.display = 'block';
                 videoPlayOverlay.style.display = 'flex';
-                showToast('Unable to play video preview', 'error');
+                
+                // Show more specific error for TikTok
+                if (videoInfo.webpage_url && videoInfo.webpage_url.includes('tiktok.com')) {
+                    showToast('TikTok video preview not available. Please download to watch.', 'error');
+                } else {
+                    showToast('Unable to play video preview', 'error');
+                }
             });
             // Remove event listener after use
             videoPlayer.oncanplay = null;
@@ -244,11 +268,35 @@ function playVideo() {
             videoPlayer.style.display = 'none';
             videoThumbnail.style.display = 'block';
             videoPlayOverlay.style.display = 'flex';
-            showToast('Video failed to load', 'error');
+            
+            // Show more specific error for TikTok
+            if (videoInfo.webpage_url && videoInfo.webpage_url.includes('tiktok.com')) {
+                showToast('TikTok video cannot be played directly. Please download to watch.', 'error');
+            } else {
+                showToast('Video failed to load', 'error');
+            }
             videoPlayer.onerror = null;
         };
+        
+        // Add timeout for TikTok videos
+        if (videoInfo.webpage_url && videoInfo.webpage_url.includes('tiktok.com')) {
+            setTimeout(() => {
+                if (videoPlayer.readyState < 4) { // HAVE_FUTURE_DATA
+                    console.log('TikTok video loading timeout');
+                    videoPlayer.style.display = 'none';
+                    videoThumbnail.style.display = 'block';
+                    videoPlayOverlay.style.display = 'flex';
+                    showToast('TikTok video loading timed out. Please download to watch.', 'error');
+                }
+            }, 10000); // 10 second timeout
+        }
     } else {
-        showToast('No suitable video format available for preview', 'error');
+        console.log('No video URL found');
+        if (videoInfo.webpage_url && videoInfo.webpage_url.includes('tiktok.com')) {
+            showToast('TikTok video preview not available. Please download to watch.', 'error');
+        } else {
+            showToast('No suitable video format available for preview', 'error');
+        }
     }
 }
 

@@ -28,12 +28,26 @@ def get_video_info():
         return jsonify({'error': 'URL required'}), 400
     
     try:
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'nocheckcertificate': True,  # Bypass SSL issues for thumbnails
-            'extract_flat': False,  # Extract full info including thumbnails
-        }
+        # Special handling for TikTok URLs
+        if 'tiktok.com' in url:
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'nocheckcertificate': True,
+                'extract_flat': False,
+                'extractor_args': {
+                    'tiktok': {
+                        'api_hostname': 'api16-normal-c-useast1a.tiktokv.com',
+                    }
+                }
+            }
+        else:
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'nocheckcertificate': True,  # Bypass SSL issues for thumbnails
+                'extract_flat': False,  # Extract full info including thumbnails
+            }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -52,6 +66,7 @@ def get_video_info():
                 'thumbnail': thumbnail,
                 'duration': info.get('duration', 0),
                 'uploader': info.get('uploader', 'Unknown'),
+                'webpage_url': info.get('webpage_url', ''),
                 'formats': [
                     {
                         'format_id': f.get('format_id'),
