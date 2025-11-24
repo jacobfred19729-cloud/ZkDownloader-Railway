@@ -468,6 +468,9 @@ function addDownloadToQueue(downloadId) {
             </div>
         </div>
         <div class="download-actions">
+            <button class="action-btn preview-btn" onclick="openVideoPreview('${downloadId}')" title="Preview" style="display:none;">
+                👁️
+            </button>
             <button class="action-btn pause-btn" onclick="pauseDownload('${downloadId}')" title="Pause">
                 ⏸️
             </button>
@@ -604,16 +607,29 @@ function updateDownloadUI(downloadId, data) {
     // Update buttons visibility
     const pauseBtn = downloadItem.querySelector('.pause-btn');
     const resumeBtn = downloadItem.querySelector('.resume-btn');
+    const previewBtn = downloadItem.querySelector('.preview-btn');
+    const cancelBtn = downloadItem.querySelector('.cancel-btn');
     
     if (data.status === 'paused') {
         pauseBtn.style.display = 'none';
         resumeBtn.style.display = 'inline-block';
+        previewBtn.style.display = 'none';
+        cancelBtn.style.display = 'inline-block';
     } else if (data.status === 'downloading' || data.status === 'preparing') {
         pauseBtn.style.display = 'inline-block';
         resumeBtn.style.display = 'none';
+        previewBtn.style.display = 'none';
+        cancelBtn.style.display = 'inline-block';
+    } else if (data.status === 'completed') {
+        pauseBtn.style.display = 'none';
+        resumeBtn.style.display = 'none';
+        previewBtn.style.display = 'inline-block';
+        cancelBtn.style.display = 'none';
     } else {
         pauseBtn.style.display = 'none';
         resumeBtn.style.display = 'none';
+        previewBtn.style.display = 'none';
+        cancelBtn.style.display = 'none';
     }
     
     // Update in activeDownloads map
@@ -851,6 +867,90 @@ async function downloadCompletedFile(downloadId) {
         showToast('Failed to save file. Please try again.', 'error');
     }
 }
+
+// Video Preview Functions
+let currentPreviewDownloadId = null;
+
+function openVideoPreview(downloadId) {
+    const download = activeDownloads.get(downloadId);
+    if (!download || download.status !== 'completed') return;
+
+    currentPreviewDownloadId = downloadId;
+    
+    const modal = document.getElementById('videoPreviewModal');
+    const player = document.getElementById('videoPreviewPlayer');
+    const title = document.getElementById('videoPreviewTitle');
+    const size = document.getElementById('videoPreviewSize');
+    const format = document.getElementById('videoPreviewFormat');
+    const duration = document.getElementById('videoPreviewDuration');
+    
+    // Set video info
+    title.textContent = download.title || 'Video Preview';
+    size.textContent = download.total ? `Size: ${formatFileSize(download.total)}` : 'Size: --';
+    format.textContent = download.formatExt ? `Format: ${download.formatExt}` : 'Format: MP4';
+    duration.textContent = videoInfo.duration ? `Duration: ${formatDuration(videoInfo.duration)}` : 'Duration: --';
+    
+    // Set video source
+    player.src = `${BACKEND_URL}/api/get-file/${downloadId}`;
+    player.load();
+    
+    // Show modal
+    modal.classList.add('active');
+    
+    // Auto-play
+    player.play().catch(e => {
+        console.log('Auto-play prevented:', e);
+    });
+}
+
+function closeVideoPreview() {
+    const modal = document.getElementById('videoPreviewModal');
+    const player = document.getElementById('videoPreviewPlayer');
+    
+    modal.classList.remove('active');
+    player.pause();
+    player.src = '';
+    currentPreviewDownloadId = null;
+}
+
+function downloadVideoFromPreview() {
+    if (currentPreviewDownloadId) {
+        downloadCompletedFile(currentPreviewDownloadId);
+        closeVideoPreview();
+    }
+}
+
+function shareVideo() {
+    if (currentPreviewDownloadId && navigator.share) {
+        const download = activeDownloads.get(currentPreviewDownloadId);
+        navigator.share({
+            title: download.title || 'Video',
+            text: `Check out this video: ${download.title}`,
+            url: window.location.href
+        }).catch(e => {
+            console.log('Share failed:', e);
+        });
+    } else {
+        // Fallback: copy URL
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            showToast('🔗 Link copied to clipboard!', 'success');
+        });
+    }
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeVideoPreview();
+    }
+});
+
+// Close modal on background click
+document.getElementById('videoPreviewModal').addEventListener('click', (e) => {
+    if (e.target.id === 'videoPreviewModal') {
+        closeVideoPreview();
+    }
+});
 
 // Load active downloads on page load
 async function loadActiveDownloads() {
