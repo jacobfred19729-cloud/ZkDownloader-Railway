@@ -17,7 +17,9 @@ import re
 app = Flask(__name__, static_folder='.', static_url_path='')
 
 # Configure session for Railway deployment
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zkdownloader-secret-key-change-in-production')
+secret_key = os.environ.get('SECRET_KEY', 'zkdownloader-secret-key-change-in-production')
+app.config['SECRET_KEY'] = secret_key
+print(f"Secret key configured: {secret_key[:10]}...")
 
 # Use simple client-side session for Railway compatibility
 app.config['SESSION_TYPE'] = 'null'
@@ -254,8 +256,11 @@ def start_download():
             'paused': False
         }
     
+    # Get user ID before starting thread (session access in main thread)
+    user_id = get_user_id()
+    
     # Start download in background thread
-    thread = Thread(target=download_worker, args=(download_id, get_user_id()))
+    thread = Thread(target=download_worker, args=(download_id, user_id))
     thread.daemon = True
     thread.start()
     
@@ -263,9 +268,15 @@ def start_download():
 
 def download_worker(download_id, user_id):
     """Background worker for downloading"""
-    user_manager = user_download_managers[user_id]
+    try:
+        user_manager = user_download_managers[user_id]
+    except KeyError:
+        print(f"User manager not found for user_id: {user_id}")
+        return
+    
     download_data = user_manager['downloads'].get(download_id)
     if not download_data:
+        print(f"Download data not found for download_id: {download_id}")
         return
     
     try:
@@ -382,7 +393,8 @@ def resume_download(download_id):
     download_data['paused'] = False
     
     # Restart download in background
-    thread = Thread(target=download_worker, args=(download_id, get_user_id()))
+    user_id = get_user_id()
+    thread = Thread(target=download_worker, args=(download_id, user_id))
     thread.daemon = True
     thread.start()
     
