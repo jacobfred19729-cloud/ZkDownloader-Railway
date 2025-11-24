@@ -12,6 +12,7 @@ import time
 import uuid
 from datetime import datetime, timedelta
 import shutil
+import re
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
@@ -36,6 +37,31 @@ CORS(app, supports_credentials=True)  # Allow credentials for sessions
 # User-specific download manager
 user_download_managers = {}
 user_sessions = {}
+
+def sanitize_filename(title, max_length=50):
+    """Sanitize and shorten filename to prevent file system errors"""
+    if not title:
+        return "video"
+    
+    # Remove special characters and emojis
+    # Keep only alphanumeric, spaces, and basic punctuation
+    sanitized = re.sub(r'[^\w\s\-_.(),]', '', title)
+    
+    # Replace multiple spaces with single space
+    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+    
+    # Remove leading/trailing punctuation
+    sanitized = sanitized.strip('._-()')
+    
+    # Limit length
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length].rstrip()
+    
+    # Ensure it's not empty
+    if not sanitized:
+        sanitized = "video"
+    
+    return sanitized
 
 def get_user_id():
     """Get or create user ID from session"""
@@ -200,7 +226,10 @@ def start_download():
     
     # Create temp directory
     temp_dir = tempfile.mkdtemp()
-    output_path = os.path.join(temp_dir, '%(title)s.%(ext)s')
+    
+    # Sanitize title for filename
+    sanitized_title = sanitize_filename(title)
+    output_path = os.path.join(temp_dir, f'{sanitized_title}.%(ext)s')
     
     # Get user-specific download manager
     user_manager = get_user_download_manager()
