@@ -3,6 +3,7 @@
 
 from flask import Flask, request, jsonify, send_file, send_from_directory, Response, stream_with_context, session
 from flask_cors import CORS
+from flask_session import Session
 import yt_dlp
 import os
 import tempfile
@@ -10,9 +11,26 @@ from threading import Thread, Lock
 import time
 import uuid
 from datetime import datetime, timedelta
+import shutil
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-app.secret_key = 'zkdownloader-secret-key-change-in-production'  # Change this in production
+
+# Configure session for Railway deployment
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zkdownloader-secret-key-change-in-production')
+
+# Try to use filesystem session, fallback to simple session
+try:
+    app.config['SESSION_TYPE'] = 'filesystem'
+    app.config['SESSION_PERMANENT'] = False
+    app.config['SESSION_USE_SIGNER'] = False  # Disable for simplicity
+    app.config['SESSION_FILE_DIR'] = tempfile.mkdtemp(prefix='sessions_')
+    Session(app)
+    print("Using filesystem session")
+except Exception as e:
+    print(f"Filesystem session failed, using simple session: {e}")
+    # Fallback to basic session
+    app.config['SESSION_TYPE'] = None
+
 CORS(app, supports_credentials=True)  # Allow credentials for sessions
 
 # User-specific download manager
@@ -21,25 +39,43 @@ user_sessions = {}
 
 def get_user_id():
     """Get or create user ID from session"""
-    if 'user_id' not in session:
-        # Generate unique user ID
-        session['user_id'] = str(uuid.uuid4())
-        session['created_at'] = datetime.now()
+    try:
+        if 'user_id' not in session:
+            # Generate unique user ID
+            session['user_id'] = str(uuid.uuid4())
+            session['created_at'] = datetime.now()
+            
+            # Initialize user download manager
+            user_download_managers[session['user_id']] = {
+                'downloads': {},  # Active downloads for this user
+                'lock': Lock()
+            }
         
-        # Initialize user download manager
-        user_download_managers[session['user_id']] = {
-            'downloads': {},  # Active downloads for this user
-            'lock': Lock()
-        }
-    
-    # Update session activity
-    session['last_activity'] = datetime.now()
-    return session['user_id']
+        # Update session activity
+        session['last_activity'] = datetime.now()
+        return session['user_id']
+    except Exception as e:
+        print(f"Session error in get_user_id: {e}")
+        # Fallback to a temporary user ID
+        return f"temp_{uuid.uuid4()}"
 
 def get_user_download_manager():
     """Get download manager for current user"""
-    user_id = get_user_id()
-    return user_download_managers[user_id]
+    try:
+        user_id = get_user_id()
+        if user_id not in user_download_managers:
+            user_download_managers[user_id] = {
+                'downloads': {},
+                'lock': Lock()
+            }
+        return user_download_managers[user_id]
+    except Exception as e:
+        print(f"Session error in get_user_download_manager: {e}")
+        # Fallback to a temporary manager
+        return {
+            'downloads': {},
+            'lock': Lock()
+        }
 
 def cleanup_old_sessions():
     """Clean up sessions older than 24 hours"""
