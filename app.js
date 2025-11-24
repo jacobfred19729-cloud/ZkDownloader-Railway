@@ -220,16 +220,33 @@ function playVideo() {
         videoPlayOverlay.style.display = 'none';
         videoPlayer.style.display = 'block';
         
-        // Set video source and play
+        // Set video source and wait for it to load before playing
         videoPlayer.src = videoUrl;
-        videoPlayer.play().catch(error => {
-            console.error('Error playing video:', error);
-            // Fallback to thumbnail if video fails to play
+        videoPlayer.load(); // Explicitly load the video
+        
+        // Wait for video to be ready before playing
+        videoPlayer.oncanplay = () => {
+            videoPlayer.play().catch(error => {
+                console.error('Error playing video:', error);
+                // Fallback to thumbnail if video fails to play
+                videoPlayer.style.display = 'none';
+                videoThumbnail.style.display = 'block';
+                videoPlayOverlay.style.display = 'flex';
+                showToast('Unable to play video preview', 'error');
+            });
+            // Remove event listener after use
+            videoPlayer.oncanplay = null;
+        };
+        
+        // Handle loading errors
+        videoPlayer.onerror = () => {
+            console.error('Video loading error');
             videoPlayer.style.display = 'none';
             videoThumbnail.style.display = 'block';
             videoPlayOverlay.style.display = 'flex';
-            showToast('Unable to play video preview', 'error');
-        });
+            showToast('Video failed to load', 'error');
+            videoPlayer.onerror = null;
+        };
     } else {
         showToast('No suitable video format available for preview', 'error');
     }
@@ -998,11 +1015,11 @@ window.pauseDownload = pauseDownload;
 window.resumeDownload = resumeDownload;
 window.cancelDownload = cancelDownload;
 
-// PWA Support
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {
-            console.log('Service Worker registration failed');
-        });
-    });
-}
+// PWA Support - Service Worker disabled (not needed for this app)
+// if ('serviceWorker' in navigator) {
+//     window.addEventListener('load', () => {
+//         navigator.serviceWorker.register('/sw.js').catch(() => {
+//             console.log('Service Worker registration failed');
+//         });
+//     });
+// }
