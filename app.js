@@ -171,7 +171,12 @@ async function fetchFormats() {
 // Display Video Info
 function displayVideoInfo(info) {
     if (info.thumbnail) {
-        videoThumbnail.src = info.thumbnail;
+        // Use proxy for Instagram thumbnails to avoid CORS issues
+        if (info.thumbnail && info.thumbnail.includes('instagram.com')) {
+            videoThumbnail.src = `${BACKEND_URL}/api/proxy-thumbnail?url=${encodeURIComponent(info.thumbnail)}`;
+        } else {
+            videoThumbnail.src = info.thumbnail;
+        }
     }
     
     videoTitle.textContent = info.title || 'Video Title';

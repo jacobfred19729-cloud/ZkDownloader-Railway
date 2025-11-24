@@ -31,14 +31,25 @@ def get_video_info():
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
+            'nocheckcertificate': True,  # Bypass SSL issues for thumbnails
+            'extract_flat': False,  # Extract full info including thumbnails
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             
+            # Handle Instagram thumbnails specifically
+            thumbnail = info.get('thumbnail', '')
+            if 'instagram.com' in url and not thumbnail:
+                # Try to get thumbnail from alternatives
+                thumbnails = info.get('thumbnails', [])
+                if thumbnails:
+                    # Get the largest thumbnail
+                    thumbnail = max(thumbnails, key=lambda x: x.get('height', 0)).get('url', '')
+            
             return jsonify({
                 'title': info.get('title', 'Unknown'),
-                'thumbnail': info.get('thumbnail', ''),
+                'thumbnail': thumbnail,
                 'duration': info.get('duration', 0),
                 'uploader': info.get('uploader', 'Unknown'),
                 'formats': [
@@ -289,6 +300,29 @@ def get_active_downloads():
 def health():
     """Health check"""
     return jsonify({'status': 'ok'})
+
+@app.route('/api/proxy-thumbnail')
+def proxy_thumbnail():
+    """Proxy thumbnail to avoid CORS issues"""
+    thumbnail_url = request.args.get('url')
+    if not thumbnail_url:
+        return jsonify({'error': 'URL required'}), 400
+    
+    try:
+        import requests
+        response = requests.get(thumbnail_url, timeout=10, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        
+        if response.status_code == 200:
+            # Determine content type
+            content_type = response.headers.get('content-type', 'image/jpeg')
+            return Response(response.content, mimetype=content_type)
+        else:
+            return jsonify({'error': 'Failed to fetch thumbnail'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/')
 def index():
