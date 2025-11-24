@@ -896,6 +896,27 @@ body::after {
     animation: shimmer 1.5s infinite;
 }
 
+/* Completed progress bar styles */
+.download-progress.completed .download-progress-fill {
+    background: linear-gradient(135deg, #10b981, #059669);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+}
+
+.download-progress.completed .download-progress-fill::after {
+    animation: none;
+    background: none;
+}
+
+.download-item.completed {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(5, 150, 105, 0.05));
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.download-item.completed .download-status {
+    color: #10b981;
+    font-weight: 600;
+}
+
 .download-stats {
     display: flex;
     justify-content: space-between;

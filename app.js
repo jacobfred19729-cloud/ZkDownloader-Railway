@@ -544,15 +544,19 @@ function updateDownloadUI(downloadId, data) {
     const progressPercentage = downloadItem.querySelector('.progress-percentage');
     const statusText = downloadItem.querySelector('.download-status');
     const speedText = downloadItem.querySelector('.download-speed');
+    const progressContainer = downloadItem.querySelector('.download-progress');
     
-    // Update progress bar
+    // Update progress bar with smooth animation
     const progress = data.progress || 0;
-    progressFill.style.width = `${progress}%`;
+    if (progressFill) {
+        progressFill.style.width = `${progress}%`;
+        progressFill.style.transition = 'width 0.3s ease';
+    }
     if (progressPercentage) {
-        progressPercentage.textContent = `${progress.toFixed(0)}%`;
+        progressPercentage.textContent = `${progress.toFixed(1)}%`;
     }
     
-    // Update status
+    // Update status with better messages
     const statusEmojis = {
         'preparing': '⏳',
         'downloading': '⬇️',
@@ -566,13 +570,33 @@ function updateDownloadUI(downloadId, data) {
     const emoji = statusEmojis[data.status] || '📥';
     let statusMsg = data.status.charAt(0).toUpperCase() + data.status.slice(1);
     
-    statusText.textContent = `${emoji} ${statusMsg}`;
+    // Special handling for completion
+    if (data.status === 'completed') {
+        statusMsg = 'Video saved!';
+        if (progressContainer) {
+            progressContainer.classList.add('completed');
+        }
+        if (downloadItem) {
+            downloadItem.classList.add('completed');
+        }
+    } else if (data.status === 'downloading') {
+        // Show real-time download info
+        const downloaded = formatFileSize(data.downloaded || 0);
+        const total = formatFileSize(data.total || 0);
+        statusMsg = `Downloading ${downloaded} / ${total}`;
+    }
     
-    // Update speed
+    if (statusText) {
+        statusText.textContent = `${emoji} ${statusMsg}`;
+    }
+    
+    // Update speed with real-time info
     if (data.speed && data.speed > 0 && data.status === 'downloading') {
         const speed = formatSpeed(data.speed);
-        const eta = data.eta ? ` • ${formatTime(data.eta)}` : '';
+        const eta = data.eta && data.eta > 0 ? ` • ${formatTime(data.eta)} left` : '';
         speedText.textContent = `${speed}${eta}`;
+    } else if (data.status === 'completed') {
+        speedText.textContent = 'Ready to view';
     } else {
         speedText.textContent = '';
     }
@@ -594,6 +618,21 @@ function updateDownloadUI(downloadId, data) {
     
     // Update in activeDownloads map
     activeDownloads.set(downloadId, { ...activeDownloads.get(downloadId), ...data });
+}
+
+// Format file size
+function formatFileSize(bytes) {
+    if (!bytes) return '0 B';
+    
+    if (bytes > 1024 * 1024 * 1024) {
+        return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    } else if (bytes > 1024 * 1024) {
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    } else if (bytes > 1024) {
+        return `${(bytes / 1024).toFixed(2)} KB`;
+    } else {
+        return `${bytes} B`;
+    }
 }
 
 // Format speed
@@ -800,7 +839,8 @@ async function downloadCompletedFile(downloadId) {
             }, 100);
         }
         
-        showToast('✅ Download saved successfully!', 'success');
+        // Show prominent completion message
+        showToast('🎉 Video saved successfully! Check your downloads.', 'success', 5000);
         
     } catch (error) {
         savedDownloads.delete(downloadId);
