@@ -1527,6 +1527,31 @@ body::after {
     .history-list {
         max-height: 400px;
     }
+    
+    /* Video preview modal mobile styles */
+    .video-preview-modal.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .video-preview-content {
+        width: 95%;
+        max-height: 95vh;
+    }
+    
+    .video-preview-player {
+        height: 250px;
+    }
+    
+    .video-preview-actions {
+        flex-direction: column;
+    }
+    
+    .video-preview-details {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
 }
 
 /* Small Mobile (360px and below) */
@@ -1549,113 +1574,6 @@ body::after {
         padding: var(--spacing-sm) var(--spacing-md);
     }
     
-}
-
-.video-preview-modal.active {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.video-preview-content {
-    background: var(--card-bg);
-    border-radius: var(--radius-xl);
-    width: 90%;
-    max-width: 800px;
-    max-height: 90vh;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    animation: slideUp 0.3s ease;
-}
-
-.video-preview-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-lg);
-    border-bottom: 1px solid rgba(139, 92, 246, 0.1);
-}
-
-.video-preview-header h3 {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: 18px;
-    font-weight: 600;
-}
-
-.video-preview-close {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    border-radius: var(--radius-full);
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.video-preview-close:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: var(--text-primary);
-}
-
-.video-preview-player {
-    background: #000;
-    position: relative;
-    width: 100%;
-    height: 400px;
-}
-
-.video-preview-player video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-
-.video-preview-info {
-    padding: var(--spacing-lg);
-    border-top: 1px solid rgba(139, 92, 246, 0.1);
-}
-
-.video-preview-details {
-    display: flex;
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-md);
-    flex-wrap: wrap;
-}
-
-.video-preview-details span {
-    font-size: 14px;
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
-.video-preview-actions {
-    display: flex;
-    gap: var(--spacing-md);
-}
-
-.video-preview-actions .btn {
-    flex: 1;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 /* Responsive Design */
