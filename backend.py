@@ -72,7 +72,7 @@ def get_video_info():
         return jsonify({'error': 'URL required'}), 400
     
     try:
-        # Special handling for TikTok URLs
+        # Special handling for different platforms
         if 'tiktok.com' in url:
             ydl_opts = {
                 'quiet': True,
@@ -82,6 +82,19 @@ def get_video_info():
                 'extractor_args': {
                     'tiktok': {
                         'api_hostname': 'api16-normal-c-useast1a.tiktokv.com',
+                    }
+                }
+            }
+        elif 'facebook.com' in url or 'fb.watch' in url:
+            # Special handling for Facebook to get formats with audio
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'nocheckcertificate': True,
+                'extract_flat': False,
+                'extractor_args': {
+                    'facebook': {
+                        'extract_flat': False,
                     }
                 }
             }
@@ -96,9 +109,9 @@ def get_video_info():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             
-            # Handle Instagram thumbnails specifically
+            # Handle Instagram and Facebook thumbnails specifically
             thumbnail = info.get('thumbnail', '')
-            if 'instagram.com' in url and not thumbnail:
+            if ('instagram.com' in url or 'facebook.com' in url or 'fb.watch' in url) and not thumbnail:
                 # Try to get thumbnail from alternatives
                 thumbnails = info.get('thumbnails', [])
                 if thumbnails:
@@ -210,9 +223,9 @@ def download_worker(download_id, user_id):
         format_id = download_data['format_id']
         url = download_data['url']
         
-        # Check if this is Instagram and format needs audio merging
-        if 'instagram.com' in url:
-            # For Instagram, use format that includes both video and audio without FFmpeg
+        # Check if this is Instagram or Facebook and format needs audio merging
+        if 'instagram.com' in url or 'facebook.com' in url or 'fb.watch' in url:
+            # For Instagram and Facebook, use format that includes both video and audio
             ydl_opts = {
                 'format': 'best[height<=720]/best',
                 'outtmpl': download_data['output_path'],
@@ -222,6 +235,9 @@ def download_worker(download_id, user_id):
                 'extractaudio': False,  # Don't extract audio separately
                 'embed_subs': False,     # Don't embed subtitles
                 'writethumbnail': False, # Don't write thumbnail
+                # Additional options for Facebook
+                'extract_flat': False,
+                'nocheckcertificate': True,
             }
         else:
             ydl_opts = {
