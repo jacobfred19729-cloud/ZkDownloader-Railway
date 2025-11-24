@@ -18,6 +18,8 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 
 # Configure session for Railway deployment
 secret_key = os.environ.get('SECRET_KEY', 'zkdownloader-secret-key-change-in-production')
+if not secret_key or secret_key == '':
+    secret_key = 'zkdownloader-railway-secret-key-2024'
 app.config['SECRET_KEY'] = secret_key
 print(f"Secret key configured: {secret_key[:10]}...")
 
@@ -102,11 +104,14 @@ def get_user_download_manager():
         return user_download_managers[user_id]
     except Exception as e:
         print(f"Session error in get_user_download_manager: {e}")
-        # Fallback to a temporary manager
-        return {
-            'downloads': {},
-            'lock': Lock()
-        }
+        # Create a fallback user ID and manager
+        fallback_id = f"fallback_{uuid.uuid4()}"
+        if fallback_id not in user_download_managers:
+            user_download_managers[fallback_id] = {
+                'downloads': {},
+                'lock': Lock()
+            }
+        return user_download_managers[fallback_id]
 
 def cleanup_old_sessions():
     """Clean up sessions older than 24 hours"""
@@ -233,8 +238,17 @@ def start_download():
     sanitized_title = sanitize_filename(title)
     output_path = os.path.join(temp_dir, f'{sanitized_title}.%(ext)s')
     
-    # Get user-specific download manager
-    user_manager = get_user_download_manager()
+    # Get user ID first (session access in main thread)
+    user_id = get_user_id()
+    
+    # Ensure user manager exists for this user ID
+    if user_id not in user_download_managers:
+        user_download_managers[user_id] = {
+            'downloads': {},
+            'lock': Lock()
+        }
+    
+    user_manager = user_download_managers[user_id]
     
     # Initialize download data for this user
     with user_manager['lock']:
@@ -255,9 +269,6 @@ def start_download():
             'error': None,
             'paused': False
         }
-    
-    # Get user ID before starting thread (session access in main thread)
-    user_id = get_user_id()
     
     # Start download in background thread
     thread = Thread(target=download_worker, args=(download_id, user_id))
