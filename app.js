@@ -11,6 +11,9 @@ const videoThumbnail = document.getElementById('videoThumbnail');
 const videoTitle = document.getElementById('videoTitle');
 const videoDuration = document.getElementById('videoDuration');
 const videoUploader = document.getElementById('videoUploader');
+const videoPlayOverlay = document.getElementById('videoPlayOverlay');
+const playButton = document.getElementById('playButton');
+const videoPlayer = document.getElementById('videoPlayer');
 const formatsGrid = document.getElementById('formatsGrid');
 const downloadSection = document.getElementById('downloadSection');
 const downloadBtn = document.getElementById('downloadBtn');
@@ -50,6 +53,21 @@ urlInput.addEventListener('keypress', (e) => {
 });
 
 downloadBtn.addEventListener('click', startDownload);
+
+// Video player event listeners
+if (playButton && videoPlayOverlay) {
+    playButton.addEventListener('click', playVideo);
+    videoPlayOverlay.addEventListener('click', playVideo);
+}
+
+if (videoPlayer) {
+    videoPlayer.addEventListener('ended', () => {
+        // Show thumbnail again when video ends
+        videoPlayer.style.display = 'none';
+        videoThumbnail.style.display = 'block';
+        videoPlayOverlay.style.display = 'flex';
+    });
+}
 
 // Bind format tabs after DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -165,6 +183,55 @@ async function fetchFormats() {
     } finally {
         fetchBtn.disabled = false;
         fetchBtn.innerHTML = '<span>🔍</span> <span>Fetch Formats</span>';
+    }
+}
+
+// Play video inline
+function playVideo() {
+    if (!videoInfo) return;
+    
+    // Get the best video URL for preview
+    let videoUrl = '';
+    
+    // Try to find a suitable format for preview
+    const previewFormats = videoInfo.formats.filter(f => 
+        f.vcodec && f.vcodec !== 'none' && 
+        f.height && f.height <= 720 && 
+        (f.ext === 'mp4' || f.ext === 'webm')
+    );
+    
+    if (previewFormats.length > 0) {
+        // Use the highest quality under 720p
+        const bestFormat = previewFormats.reduce((best, current) => 
+            (current.height > best.height) ? current : best
+        );
+        videoUrl = bestFormat.url;
+    } else {
+        // Fallback to any video format
+        const videoFormat = videoInfo.formats.find(f => 
+            f.vcodec && f.vcodec !== 'none' && f.url
+        );
+        videoUrl = videoFormat ? videoFormat.url : '';
+    }
+    
+    if (videoUrl) {
+        // Hide thumbnail and show video player
+        videoThumbnail.style.display = 'none';
+        videoPlayOverlay.style.display = 'none';
+        videoPlayer.style.display = 'block';
+        
+        // Set video source and play
+        videoPlayer.src = videoUrl;
+        videoPlayer.play().catch(error => {
+            console.error('Error playing video:', error);
+            // Fallback to thumbnail if video fails to play
+            videoPlayer.style.display = 'none';
+            videoThumbnail.style.display = 'block';
+            videoPlayOverlay.style.display = 'flex';
+            showToast('Unable to play video preview', 'error');
+        });
+    } else {
+        showToast('No suitable video format available for preview', 'error');
     }
 }
 

@@ -78,6 +78,17 @@
             <div class="video-preview">
                 <div class="video-thumbnail">
                     <img id="videoThumbnail" src="" alt="Video thumbnail" loading="lazy">
+                    <div class="video-play-overlay" id="videoPlayOverlay">
+                        <button class="play-button" id="playButton">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <video id="videoPlayer" class="video-player" controls style="display: none;">
+                        <source src="" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
                 </div>
                 <div class="video-details">
                     <h3 id="videoTitle"></h3>

@@ -65,6 +65,7 @@ def get_video_info():
                         'abr': f.get('abr', 0),
                         'fps': f.get('fps', 0),
                         'tbr': f.get('tbr', 0),
+                        'url': f.get('url', ''),
                     }
                     for f in info.get('formats', [])
                 ]
