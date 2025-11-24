@@ -18,18 +18,18 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 # Configure session for Railway deployment
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'zkdownloader-secret-key-change-in-production')
 
-# Try to use filesystem session, fallback to simple session
+# Use simple client-side session for Railway compatibility
+app.config['SESSION_TYPE'] = 'null'
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_USE_SIGNER'] = False
+
+# Initialize session
 try:
-    app.config['SESSION_TYPE'] = 'filesystem'
-    app.config['SESSION_PERMANENT'] = False
-    app.config['SESSION_USE_SIGNER'] = False  # Disable for simplicity
-    app.config['SESSION_FILE_DIR'] = tempfile.mkdtemp(prefix='sessions_')
     Session(app)
-    print("Using filesystem session")
+    print("Session initialized successfully")
 except Exception as e:
-    print(f"Filesystem session failed, using simple session: {e}")
-    # Fallback to basic session
-    app.config['SESSION_TYPE'] = None
+    print(f"Session initialization failed: {e}")
+    # Continue without session - will use fallback mechanism
 
 CORS(app, supports_credentials=True)  # Allow credentials for sessions
 
@@ -40,20 +40,23 @@ user_sessions = {}
 def get_user_id():
     """Get or create user ID from session"""
     try:
-        if 'user_id' not in session:
+        # Try to get user ID from session
+        user_id = session.get('user_id')
+        if not user_id:
             # Generate unique user ID
-            session['user_id'] = str(uuid.uuid4())
+            user_id = str(uuid.uuid4())
+            session['user_id'] = user_id
             session['created_at'] = datetime.now()
             
             # Initialize user download manager
-            user_download_managers[session['user_id']] = {
+            user_download_managers[user_id] = {
                 'downloads': {},  # Active downloads for this user
                 'lock': Lock()
             }
         
         # Update session activity
         session['last_activity'] = datetime.now()
-        return session['user_id']
+        return user_id
     except Exception as e:
         print(f"Session error in get_user_id: {e}")
         # Fallback to a temporary user ID
@@ -421,7 +424,20 @@ def get_active_downloads():
 @app.route('/health', methods=['GET'])
 def health():
     """Health check"""
-    return jsonify({'status': 'ok'})
+    try:
+        # Test session functionality
+        test_user_id = get_user_id()
+        return jsonify({
+            'status': 'ok',
+            'session_test': 'working',
+            'user_id': test_user_id[:8] + '...',  # Only show first 8 chars for privacy
+            'active_users': len(user_download_managers)
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
 @app.route('/api/proxy-thumbnail')
 def proxy_thumbnail():
